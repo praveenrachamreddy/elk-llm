@@ -1,0 +1,24 @@
+User: "Why did service X crash yesterday afternoon?"
+     ↓
+LangChain:
+  → Translates to Elasticsearch DSL query (for logs of service X, timestamp: yesterday afternoon)
+  → Gets relevant logs
+  → Sends logs to Mistral with prompt: "Summarize and explain root cause"
+     ↓
+Mistral: 
+  → Returns summary: "Service X failed due to database timeout. Observed repeated connection errors to DB Y."
+     ↓
+LangChain/UI: 
+  → Presents this to user + suggests next steps
+  
+---
+
+[User prompt] 
+     ↓
+[MCP Client] — (natural language) → [Elasticsearch MCP Server]
+     ↓                            ↳ Executes queries, lists metadata
+[MCP Client] collects JSON response → passes to LangChain
+     ↓
+LangChain sends to Mistral → returns analysis + root-cause + suggestions
+     ↓
+User receives summary and recommendations
