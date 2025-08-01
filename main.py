@@ -1,58 +1,109 @@
+import os
+import json
+from typing import Optional, Type
 import requests
-from langchain.llms.base import LLM
-from typing import Optional, List
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+from langchain.tools import BaseTool
+from langchain.agents import initialize_agent, AgentType
+from langchain.chat_models import ChatOpenAI
+from langchain.agents.agent_toolkits import Tool
+from langchain.schema import SystemMessage
 
-# -------- CONFIG --------
-MCP_SERVER_URL = "http://elasticsearch-mcp-server:3000"
-MISTRAL_API_URL = "http://mistral-endpoint:8080/v1/completions"
-MISTRAL_MODEL_ID = "mistral-7b"
+# Load ENV
+MODEL_ENDPOINT = os.getenv("MODEL_ENDPOINT")
+ES_URL = os.getenv("ES_URL")
+ES_USERNAME = os.getenv("ES_USERNAME")
+ES_PASSWORD = os.getenv("ES_PASSWORD")
+ES_INDEX = os.getenv("ES_INDEX", "praveen-*")
 
-# -------- Step 1: Call MCP Server --------
-def query_elastic_mcp(question: str) -> str:
-    payload = {
-        "question": question,
-        "index": "tataesb*"
-    }
-    response = requests.post(f"{MCP_SERVER_URL}/search", json=payload)
-    response.raise_for_status()
-    results = response.json()
-    return results.get("answer", str(results))  # `answer` is usually present
+# ============ Elasticsearch Tool ============
+class SearchLogsInput(BaseModel):
+    query: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
-# -------- Step 2: Define custom LLM wrapper for Mistral --------
-class MistralLLM(LLM):
-    def _call(self, prompt: str, stop: Optional[List[str]] = None) -> str:
-        payload = {
-            "model": MISTRAL_MODEL_ID,
-            "prompt": prompt,
-            "stream": False,
-            "temperature": 0.7,
-            "max_tokens": 512
+class ElasticsearchTool(BaseTool):
+    name = "search_logs"
+    description = "Search logs in Elasticsearch with a query string and optional date range"
+    args_schema: Type[BaseModel] = SearchLogsInput
+
+    def _run(self, query: str, start_date: Optional[str] = None, end_date: Optional[str] = None):
+        headers = {"Content-Type": "application/json"}
+        must_clauses = [{"match": {"message": query}}]
+        if start_date and end_date:
+            must_clauses.append({
+                "range": {
+                    "@timestamp": {
+                        "gte": start_date,
+                        "lte": end_date
+                    }
+                }
+            })
+
+        body = {
+            "query": {
+                "bool": {
+                    "must": must_clauses
+                }
+            },
+            "size": 5
         }
-        response = requests.post(MISTRAL_API_URL, json=payload)
-        response.raise_for_status()
-        return response.json()["choices"][0]["text"]
 
-    @property
-    def _identifying_params(self):
-        return {}
+        try:
+            res = requests.get(
+                f"{ES_URL}/{ES_INDEX}/_search",
+                auth=(ES_USERNAME, ES_PASSWORD),
+                headers=headers,
+                data=json.dumps(body),
+                verify=False
+            )
+            data = res.json()
+            hits = data.get("hits", {}).get("hits", [])
+            results = []
+            for hit in hits:
+                src = hit.get("_source", {})
+                msg = src.get("message", "No message")
+                timestamp = src.get("@timestamp", "No timestamp")
+                results.append(f"{timestamp}: {msg}")
+            return "\n".join(results) if results else "No logs found."
+        except Exception as e:
+            return f"Error: {str(e)}"
 
-    @property
-    def _llm_type(self):
-        return "mistral-custom"
+    def _arun(self, *args, **kwargs):
+        raise NotImplementedError("Async not supported.")
 
-# -------- Step 3: Chain everything --------
-def ask_question(question: str):
-    print(f"❓ User question: {question}")
-    mcp_result = query_elastic_mcp(question)
-    print(f"📦 Retrieved from MCP:\n{mcp_result}")
+# ============ Model Wrapper ============
+class GemmaChatModel(ChatOpenAI):
+    def __init__(self, **kwargs):
+        super().__init__(
+            model="gemma-tool-agent",
+            temperature=0,
+            openai_api_key="not-needed",
+            openai_api_base=MODEL_ENDPOINT.replace("/v1/chat/completions", ""),
+            openai_api_type="open_ai",
+            openai_api_version="v1",
+            **kwargs
+        )
 
-    llm = MistralLLM()
-    prompt = f"Based on this Elasticsearch data, answer clearly:\n\n{mcp_result}"
-    answer = llm(prompt)
+# ============ Agent Setup ============
+tools = [ElasticsearchTool()]
+llm = GemmaChatModel()
+agent = initialize_agent(tools, llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
-    print(f"\n🤖 Final LLM Answer:\n{answer}")
+# ============ FastAPI Server ============
+app = FastAPI()
 
-# -------- Main entry --------
-if __name__ == "__main__":
-    user_input = input("Ask something about ELK logs: ")
-    ask_question(user_input)
+@app.get("/")
+def home():
+    return {"message": "LangChain Elasticsearch Tool Agent is running."}
+
+@app.post("/query")
+async def query(req: Request):
+    body = await req.json()
+    question = body.get("question")
+    if not question:
+        return {"error": "Missing 'question' in body"}
+
+    result = agent.run(question)
+    return {"response": result}

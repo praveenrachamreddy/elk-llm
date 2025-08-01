@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langchain-elastic-agent
+  namespace: praveen-datascience
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langchain-elastic-agent
+  template:
+    metadata:
+      labels:
+        app: langchain-elastic-agent
+    spec:
+      containers:
+      - name: agent
+        image: image-registry.openshift-image-registry.svc:5000/praveen-datascience/YOUR_IMAGE_NAME
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MODEL_ENDPOINT
+          value: "https://gemma3-12b-model-praveen-datascience.apps.ocp4.imss.work/v1/chat/completions"
+        - name: ES_URL
+          value: "https://172.16.3.63:9200"
+        - name: ES_USERNAME
+          value: "elastic"
+        - name: ES_PASSWORD
+          value: "password"
+        - name: ES_INDEX
+          value: "praveen-*"
+        imagePullPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langchain-elastic-agent
+  namespace: praveen-datascience
+spec:
+  selector:
+    app: langchain-elastic-agent
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: langchain-elastic-agent
+  namespace: praveen-datascience
+spec:
+  to:
+    kind: Service
+    name: langchain-elastic-agent
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+---
+
+curl -X POST https://langchain-elastic-agent-praveen-datascience.apps.ocp4.imss.work/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Show me 500 errors in the last 2 days."}'
