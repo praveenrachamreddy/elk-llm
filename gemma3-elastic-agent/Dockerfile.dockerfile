@@ -17,9 +17,8 @@ USER 0
 #     dnf install -y nodejs npm git && \
 #     dnf clean all
 
-# Install Elasticsearch MCP server globally
-RUN npm install -g @modelcontextprotocol/server-elasticsearch && \
-    npm cache clean --force
+# Install the MCP server module globally
+RUN npm install -g @elastic/mcp-server-elasticsearch && npm cache clean --force
 
 # Switch to non-root for OpenShift compatibility
 USER 1001
