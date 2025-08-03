@@ -28,7 +28,7 @@ WORKDIR /opt/app-root/src
 
 # Copy and install Python dependencies
 COPY --chown=1001:0 requirements.txt ./
-RUN pip install --user --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY --chown=1001:0 . .
