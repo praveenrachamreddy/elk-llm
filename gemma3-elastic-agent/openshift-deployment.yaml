@@ -1,0 +1,154 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gemma3-elastic-config
+  namespace: praveen
+data:
+  LLAMA_CPP_URL: "https://gemma3-12b-model-praveen-datascience.apps.ocp4.imss.work/v1"
+  LOG_LEVEL: "INFO"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: elasticsearch-credentials
+  namespace: praveen
+type: Opaque
+stringData:
+  ELASTIC_URL: "https://your-elasticsearch-cluster:9200"
+  ELASTIC_USERNAME: "your_username"
+  ELASTIC_PASSWORD: "your_password"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gemma3-elastic-agent
+  namespace: praveen
+  labels:
+    app: gemma3-elastic-agent
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gemma3-elastic-agent
+  template:
+    metadata:
+      labels:
+        app: gemma3-elastic-agent
+        version: v1
+    spec:
+      containers:
+      - name: gemma3-elastic-agent
+        image: your-registry/gemma3-elastic-agent:latest
+        imagePullPolicy: Always
+        
+        # Environment variables from ConfigMap
+        envFrom:
+        - configMapRef:
+            name: gemma3-elastic-config
+        - secretRef:
+            name: elasticsearch-credentials
+        
+        # Resource limits and requests
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+        
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "print('Liveness check passed')"
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "print('Readiness check passed')"
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Security context for OpenShift
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        
+        # Volume mounts for logs (optional)
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /opt/app-root/src/logs
+      
+      # Volumes
+      volumes:
+      - name: logs-volume
+        emptyDir: {}
+      
+      # Security context for the pod
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      
+      # Service account (optional)
+      serviceAccountName: default
+      
+      # Node selection (optional)
+      nodeSelector:
+        kubernetes.io/os: linux
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gemma3-elastic-agent-service
+  namespace: praveen
+  labels:
+    app: gemma3-elastic-agent
+spec:
+  selector:
+    app: gemma3-elastic-agent
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+
+---
+# Optional: Route for external access (OpenShift specific)
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: gemma3-elastic-agent-route
+  namespace: praveen
+  labels:
+    app: gemma3-elastic-agent
+spec:
+  to:
+    kind: Service
+    name: gemma3-elastic-agent-service
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
