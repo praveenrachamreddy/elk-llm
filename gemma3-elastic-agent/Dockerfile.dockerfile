@@ -1,4 +1,4 @@
-# OpenShift-compatible single image for Gemma3 Elasticsearch MCP Integration
+# OpenShift-compatible image for Gemma3 + Elasticsearch MCP integration
 FROM registry.access.redhat.com/ubi8/python-311
 
 # Set environment variables
@@ -9,42 +9,42 @@ ENV PYTHONUNBUFFERED=1 \
     HOME=/opt/app-root/src \
     PATH=/opt/app-root/src/.local/bin:$PATH
 
-# Switch to root to install system dependencies
+# Switch to root to install dependencies
 USER 0
 
-# Install Node.js and system dependencies
+# Install Node.js 18 and system tools using dnf
 RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
-    microdnf install -y nodejs npm git && \
-    microdnf clean all
+    dnf install -y nodejs npm git && \
+    dnf clean all
 
-# Install global npm packages
+# Install Elasticsearch MCP server globally
 RUN npm install -g @modelcontextprotocol/server-elasticsearch && \
     npm cache clean --force
 
-# Switch back to default user for OpenShift compatibility
+# Switch to non-root for OpenShift compatibility
 USER 1001
 
 # Set working directory
 WORKDIR /opt/app-root/src
 
-# Copy requirements and install Python dependencies
+# Copy and install Python dependencies
 COPY --chown=1001:0 requirements.txt ./
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY --chown=1001:0 . .
 
-# Create necessary directories with proper permissions
+# Create writable directories
 RUN mkdir -p logs && \
     chmod -R g+w /opt/app-root/src && \
     chmod +x main.py
 
-# Expose port (if needed for health checks)
+# Expose MCP server port if needed
 EXPOSE 8080
 
-# Health check
+# Optional: Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "print('Health check passed')" || exit 1
 
-# Default command
+# Start LangChain app that connects to Gemma3 and MCP
 CMD ["python", "main.py"]
