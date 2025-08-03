@@ -12,10 +12,10 @@ ENV PYTHONUNBUFFERED=1 \
 # Switch to root to install dependencies
 USER 0
 
-# Install Node.js 18 and system tools using dnf
-RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
-    dnf install -y nodejs npm git && \
-    dnf clean all
+# # Install Node.js 18 and system tools using dnf
+# RUN curl -fsSL https://rpm.nodesource.com/setup_18.x | bash - && \
+#     dnf install -y nodejs npm git && \
+#     dnf clean all
 
 # Install Elasticsearch MCP server globally
 RUN npm install -g @modelcontextprotocol/server-elasticsearch && \
