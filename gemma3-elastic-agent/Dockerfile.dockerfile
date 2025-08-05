@@ -44,10 +44,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY --chown=1001:0 . .
 
+USER 0
+
 # Create writable directories
 RUN mkdir -p logs && \
     chmod -R g+w /opt/app-root/src && \
     chmod +x main.py
+
+USER 1001
 
 # Expose MCP server port if needed
 EXPOSE 8080
@@ -58,6 +62,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Start LangChain app that connects to Gemma3 and MCP
 CMD ["python", "main.py"]
+
 
 
 
