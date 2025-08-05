@@ -9,7 +9,7 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_community.chat_models import ChatLlamaCpp
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -233,4 +233,5 @@ if __name__ == "__main__":
     print("🚀 Starting Gemma3 + Elasticsearch integration...")
 
     asyncio.run(main())
+
 
