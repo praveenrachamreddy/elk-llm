@@ -25,8 +25,10 @@ RUN npm install -g @elastic/mcp-server-elasticsearch && npm cache clean --force
 RUN dnf install -y gcc gcc-c++ cmake make libstdc++-devel git && \
     dnf clean all
 
-# Set compiler flags to avoid architecture-specific optimizations
-ENV CMAKE_ARGS="-DGGML_NATIVE=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++"
+# Set environment variables to fix C++17 filesystem linking issues
+ENV CMAKE_ARGS="-DGGML_NATIVE=OFF -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++" \
+    LDFLAGS="-lstdc++fs" \
+    CXXFLAGS="-std=c++17"
 
 # Switch to non-root for OpenShift compatibility
 USER 1001
@@ -55,5 +57,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Start LangChain app that connects to Gemma3 and MCP
 CMD ["python", "main.py"]
+
 
 
