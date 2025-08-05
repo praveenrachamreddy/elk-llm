@@ -9,6 +9,7 @@ from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_community.chat_models import ChatLlamaCpp
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import HumanMessage
+from langchain_openai import ChatOpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -74,15 +75,16 @@ class Gemma3ElasticAgent:
     def _initialize_llm(self):
         """Initialize the Gemma3 model via LlamaCpp."""
         try:
-            self.llm = ChatLlamaCpp(
-                base_url=self.llama_url,
-                model="gemma-3-12b-q4.gguf",  # Model name (can be arbitrary for llama.cpp)
-                temperature=0.1,  # Slightly higher for better reasoning
-                max_tokens=2048,  # Reasonable token limit
-                n_ctx=4096,  # Context window
-                streaming=False,  # Set to True if you want streaming responses
-                verbose=False,  # Set to True for debugging
-            )
+            # self.llm = ChatOpenAI(
+            #     base_url=self.llama_url,
+            #     model="gemma-3-12b-q4.gguf",  # Model name (can be arbitrary for llama.cpp)
+            #     temperature=0.1,  # Slightly higher for better reasoning
+            #     max_tokens=2048,  # Reasonable token limit
+            #     n_ctx=4096,  # Context window
+            #     streaming=False,  # Set to True if you want streaming responses
+            #     verbose=False,  # Set to True for debugging
+            # )
+            
             logger.info(f"LLM initialized with base URL: {self.llama_url}")
         except Exception as e:
             logger.error(f"Failed to initialize LLM: {e}")
@@ -231,3 +233,4 @@ if __name__ == "__main__":
     print("🚀 Starting Gemma3 + Elasticsearch integration...")
 
     asyncio.run(main())
+
