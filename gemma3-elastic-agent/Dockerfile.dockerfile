@@ -1,6 +1,6 @@
 # OpenShift-compatible image for Gemma3 + Elasticsearch MCP integration
 #FROM registry.access.redhat.com/ubi8/python-311
-FROM image-registry.openshift-image-registry.svc:5000/openshift/python:3.11-ubi8
+FROM image-registry.openshift-image-registry.svc:5000/openshift/python:3.11-ubi9
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -58,6 +58,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 # Start LangChain app that connects to Gemma3 and MCP
 CMD ["python", "main.py"]
+
 
 
 
