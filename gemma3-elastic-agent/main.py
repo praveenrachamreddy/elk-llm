@@ -60,81 +60,80 @@ class ElasticsearchMCPClient:
         return url
     
     @asynccontextmanager
-    async def get_session(self):
-        """Context manager that yields a ready-to-use MCP session for Elasticsearch."""
-        try:
-            # Build MCP server command with authentication if provided
-            server_args = [
-                "-y",
-                "@elastic/mcp-server-elasticsearch",
-                f"--elasticsearch-url={self.elastic_url}",
-            ]
-            
-            # Add authentication if credentials are provided
-            if self.username and self.password:
-                server_args.extend([
-                    f"--username={self.username}",
-                    f"--password={self.password}"
-                ])
-            
-            # Add additional debugging
-            logger.info(f"MCP server command: npx {' '.join(server_args)}")
-            
-            server = StdioServerParameters(
-                command="npx",
-                args=server_args,
-                env=os.environ.copy()  # Pass environment variables
-            )
-            
-            logger.info(f"Connecting to Elasticsearch at {self.elastic_url}")
-            async with stdio_client(server) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    logger.info("MCP session initialized successfully")
-                    yield session
-                    
-        except Exception as e:
-            logger.error(f"Failed to establish MCP session: {e}")
-            
-            # Try with http if https failed and it's an internal IP
-            if 'https://' in self.elastic_url and any(
-                self.elastic_url.startswith(f'https://{prefix}') 
-                for prefix in ['172.', '192.168.', '10.', 'localhost']
-            ):
-                http_url = self.elastic_url.replace('https://', 'http://')
-                logger.info(f"Retrying with HTTP URL: {http_url}")
+async def get_session(self):
+    """Context manager that yields a ready-to-use MCP session for Elasticsearch."""
+    try:
+        # Set environment variables for the MCP server
+        env = os.environ.copy()
+        env["ES_URL"] = self.elastic_url
+        
+        # Handle authentication - try API key first, then username/password
+        if self.username and self.password:
+            # For basic auth, we might need to construct the URL or use different env vars
+            env["ES_USERNAME"] = self.username
+            env["ES_PASSWORD"] = self.password
+        
+        # Simple server args without URL parameters
+        server_args = [
+            "-y",
+            "@elastic/mcp-server-elasticsearch"
+        ]
+        
+        logger.info(f"MCP server command: npx {' '.join(server_args)}")
+        logger.info(f"ES_URL environment variable: {self.elastic_url}")
+        
+        server = StdioServerParameters(
+            command="npx",
+            args=server_args,
+            env=env  # Pass the environment with ES_URL
+        )
+        
+        logger.info(f"Connecting to Elasticsearch at {self.elastic_url}")
+        async with stdio_client(server) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                logger.info("MCP session initialized successfully")
+                yield session
                 
-                try:
-                    server_args = [
-                        "-y",
-                        "@elastic/mcp-server-elasticsearch",
-                        f"--elasticsearch-url={http_url}",
-                    ]
-                    
-                    if self.username and self.password:
-                        server_args.extend([
-                            f"--username={self.username}",
-                            f"--password={self.password}"
-                        ])
-                    
-                    server = StdioServerParameters(
-                        command="npx",
-                        args=server_args,
-                        env=os.environ.copy()
-                    )
-                    
-                    async with stdio_client(server) as (read, write):
-                        async with ClientSession(read, write) as session:
-                            await session.initialize()
-                            logger.info("MCP session initialized successfully with HTTP")
-                            self.elastic_url = http_url  # Update the URL for future use
-                            yield session
-                            return
-                            
-                except Exception as http_error:
-                    logger.error(f"HTTP retry also failed: {http_error}")
+    except Exception as e:
+        logger.error(f"Failed to establish MCP session: {e}")
+        
+        # Try with http if https failed
+        if 'https://' in self.elastic_url:
+            http_url = self.elastic_url.replace('https://', 'http://')
+            logger.info(f"Retrying with HTTP URL: {http_url}")
             
-            raise
+            try:
+                env = os.environ.copy()
+                env["ES_URL"] = http_url
+                
+                if self.username and self.password:
+                    env["ES_USERNAME"] = self.username
+                    env["ES_PASSWORD"] = self.password
+                
+                server_args = [
+                    "-y",
+                    "@elastic/mcp-server-elasticsearch"
+                ]
+                
+                server = StdioServerParameters(
+                    command="npx",
+                    args=server_args,
+                    env=env
+                )
+                
+                async with stdio_client(server) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        logger.info("MCP session initialized successfully with HTTP")
+                        self.elastic_url = http_url
+                        yield session
+                        return
+                        
+            except Exception as http_error:
+                logger.error(f"HTTP retry also failed: {http_error}")
+        
+        raise
 
 class Gemma3ElasticAgent:
     """Main agent class that orchestrates Gemma3 model with Elasticsearch tools."""
@@ -343,4 +342,5 @@ if __name__ == "__main__":
     print("🚀 Starting Gemma3 + Elasticsearch integration...")
 
     asyncio.run(main())
+
 
