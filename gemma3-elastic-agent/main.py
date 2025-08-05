@@ -66,6 +66,7 @@ class ElasticsearchMCPClient:
             # Set environment variables for the MCP server
             env = os.environ.copy()
             env["ES_URL"] = self.elastic_url
+            env["OTEL_SDK_DISABLED"] = "true"  # Disable OpenTelemetry to avoid warnings
             
             # Handle authentication - try API key first, then username/password
             if self.username and self.password:
@@ -217,6 +218,11 @@ async def test_elasticsearch_connection(elastic_config):
             # Try to list available tools
             tools = await load_mcp_tools(session)
             logger.info(f"✅ Elasticsearch connection successful! Found {len(tools)} tools")
+            
+            # Log the tool names
+            for tool in tools:
+                logger.info(f"Available tool: {tool.name}")
+            
             return True
             
     except Exception as e:
@@ -342,6 +348,7 @@ if __name__ == "__main__":
     print("🚀 Starting Gemma3 + Elasticsearch integration...")
 
     asyncio.run(main())
+
 
 
 
