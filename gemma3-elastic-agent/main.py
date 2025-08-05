@@ -35,7 +35,7 @@ class ElasticsearchMCPClient:
             # Build MCP server command with authentication if provided
             server_args = [
                 "-y",
-                "@modelcontextprotocol/server-elasticsearch",
+                "@elastic/mcp-server-elasticsearch",
                 "--elasticsearch-url", self.elastic_url,
             ]
             
@@ -229,4 +229,5 @@ if __name__ == "__main__":
         exit(1)
     
     print("🚀 Starting Gemma3 + Elasticsearch integration...")
+
     asyncio.run(main())
