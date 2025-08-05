@@ -67,14 +67,14 @@ class ElasticsearchMCPClient:
             server_args = [
                 "-y",
                 "@elastic/mcp-server-elasticsearch",
-                "--elasticsearch-url", self.elastic_url,
+                f"--elasticsearch-url={self.elastic_url}",
             ]
             
             # Add authentication if credentials are provided
             if self.username and self.password:
                 server_args.extend([
-                    "--username", self.username,
-                    "--password", self.password
+                    f"--username={self.username}",
+                    f"--password={self.password}"
                 ])
             
             # Add additional debugging
@@ -108,13 +108,13 @@ class ElasticsearchMCPClient:
                     server_args = [
                         "-y",
                         "@elastic/mcp-server-elasticsearch",
-                        "--elasticsearch-url", http_url,
+                        f"--elasticsearch-url={http_url}",
                     ]
                     
                     if self.username and self.password:
                         server_args.extend([
-                            "--username", self.username,
-                            "--password", self.password
+                            f"--username={self.username}",
+                            f"--password={self.password}"
                         ])
                     
                     server = StdioServerParameters(
@@ -343,3 +343,4 @@ if __name__ == "__main__":
     print("🚀 Starting Gemma3 + Elasticsearch integration...")
 
     asyncio.run(main())
+
